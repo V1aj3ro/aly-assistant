@@ -8,11 +8,12 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 
 # =============================================================================
-# Gemini
+# Ollama (локальная LLM, без API ключей)
 # =============================================================================
-GEMINI_API_KEY = "AIzaSyBrUc7xoM83VEfx3V_bpqWT_NRC0iZ1Kxg"
-GEMINI_MODEL = "gemini-1.5-flash"  # 2.0-flash требует биллинг; 1.5-flash бесплатно 1500/день
-GEMINI_MIN_INTERVAL = 4.0   # минимум секунд между запросами (rate limit)
+OLLAMA_HOST = "http://localhost:11434"
+OLLAMA_MODEL = "llava:7b"   # vision модель; альтернатива: moondream (1.8GB, быстрее)
+OLLAMA_TIMEOUT = 60         # секунд на ответ
+OLLAMA_MIN_INTERVAL = 1.0   # минимум секунд между запросами
 
 # =============================================================================
 # Whisper

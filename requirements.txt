@@ -11,8 +11,8 @@ faster-whisper
 sounddevice
 numpy
 
-# Gemini API
-google-genai
+# Ollama (локальная LLM)
+requests
 
 # Скриншот
 mss
