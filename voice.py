@@ -2,7 +2,8 @@
 voice.py — Edge TTS + RVC pipeline (Windows-совместимая версия)
 
 Edge TTS сохраняет MP3, не WAV.
-Воспроизведение через pygame.mixer (поддерживает MP3 и WAV на Windows).
+Воспроизведение через pydub + sounddevice (без pygame — нет wheel для Python 3.14).
+pydub декодирует MP3 через ffmpeg в numpy array → sounddevice играет.
 RVC работает с WAV → конвертируем MP3→WAV через pydub.
 """
 
@@ -11,10 +12,11 @@ import logging
 import os
 import tempfile
 import threading
-import time
 
 import edge_tts
-import pygame
+import numpy as np
+import sounddevice as sd
+from pydub import AudioSegment
 
 import config
 
@@ -24,10 +26,6 @@ logger = logging.getLogger(__name__)
 _is_speaking: threading.Event | None = None
 _live2d = None
 _rvc = None
-
-# Инициализация pygame.mixer один раз
-pygame.mixer.pre_init(frequency=44100, size=-16, channels=1, buffer=512)
-pygame.mixer.init()
 
 
 def init(is_speaking_flag: threading.Event, live2d_instance=None):
@@ -148,32 +146,25 @@ def _apply_rvc(input_path: str) -> str:
 
 
 def _get_duration(path: str) -> float:
-    """Длительность аудио в секундах."""
+    """Длительность аудио в секундах через pydub."""
     try:
-        # pygame может определить длину без librosa
-        snd = pygame.mixer.Sound(path)
-        return snd.get_length()
+        audio = AudioSegment.from_file(path)
+        return len(audio) / 1000.0
     except Exception:
-        try:
-            import soundfile as sf
-            info = sf.info(path)
-            return info.duration
-        except Exception:
-            return 3.0
+        return 3.0
 
 
 def _play_audio(path: str):
-    """Воспроизведение через pygame.mixer (поддерживает MP3 и WAV)."""
+    """Воспроизведение через pydub (декодирует MP3/WAV через ffmpeg) + sounddevice."""
     try:
-        pygame.mixer.music.load(path)
-        pygame.mixer.music.play()
-        # Ждём окончания
-        while pygame.mixer.music.get_busy():
-            time.sleep(0.05)
+        audio = AudioSegment.from_file(path)
+        audio = audio.set_channels(1)           # mono
+        audio = audio.set_sample_width(2)       # 16-bit
+        samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
+        samples_f32 = samples.astype(np.float32) / 32768.0
+        sd.play(samples_f32, samplerate=audio.frame_rate)
+        sd.wait()
     except Exception as exc:
         logger.error("Ошибка воспроизведения: %s", exc)
     finally:
-        try:
-            pygame.mixer.music.unload()
-        except Exception:
-            pass
+        sd.stop()

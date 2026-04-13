@@ -28,13 +28,8 @@ edge-tts
 # RVC (конвертация голоса) — требует Python 3.10
 rvc-python
 
-# Воспроизведение аудио
-pygame
-
-# MP3 → WAV конвертация (нужен ffmpeg)
+# Аудио воспроизведение + конвертация MP3/WAV (нужен ffmpeg в PATH)
 pydub
-
-# Длительность аудио (fallback)
 soundfile
 
 # VTube Studio WebSocket
