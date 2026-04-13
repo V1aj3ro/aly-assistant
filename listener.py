@@ -123,8 +123,7 @@ class Listener:
                 audio,
                 language="ru",
                 beam_size=5,
-                vad_filter=True,
-                vad_parameters={"min_silence_duration_ms": 500},
+                vad_filter=False,   # наш VAD уже отрезал тишину; Whisper VAD срезает "Аля" в начале
             )
             text = " ".join(s.text for s in segments).strip()
         except Exception as exc:
