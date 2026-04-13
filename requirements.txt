@@ -1,24 +1,44 @@
-# Голос и аудио
+# ============================================================
+# Установка:
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#   pip install -r requirements.txt
+# ============================================================
+
+# Whisper (транскрипция речи)
 faster-whisper
+
+# Аудио ввод
 sounddevice
-soundfile
-edge-tts
-rvc-python
-librosa
 numpy
 
-# Зрение и управление экраном
+# Gemini API
 google-generativeai
+
+# Скриншот
 mss
 Pillow
+
+# Управление ПК
 pyautogui
 pyperclip
 
-# Live2D / VTube Studio
+# Edge TTS (синтез речи)
+edge-tts
+
+# RVC (конвертация голоса) — требует Python 3.10
+rvc-python
+
+# Воспроизведение аудио
+pygame
+
+# MP3 → WAV конвертация (нужен ffmpeg)
+pydub
+
+# Длительность аудио (fallback)
+soundfile
+
+# VTube Studio WebSocket
 websockets
 
-# Трей
+# Системный трей
 pystray
-
-# Вспомогательное
-pydub

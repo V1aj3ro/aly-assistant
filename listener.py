@@ -1,19 +1,18 @@
 """
-listener.py — микрофон + Whisper (faster-whisper, CUDA)
+listener.py — микрофон + Whisper (Windows-версия)
 
-Алгоритм:
-1. Читаем чанки с микрофона через sounddevice
-2. VAD по энергетическому порогу (RMS)
-3. Когда VAD срабатывает — накапливаем аудио
-4. После 1.5 сек тишины — отправляем в Whisper
-5. Ищем wake-word регуляркой
-6. Кладём чистую команду в command_queue
+- faster-whisper на CUDA (GTX 1080: float16)
+- sounddevice для захвата аудио (WASAPI на Windows)
+- VAD по RMS энергии
+- Wake-word регуляркой с учётом транслитерации
+- Пока Аля говорит (is_speaking) — не слушаем
 """
 
-import re
-import queue
 import logging
+import queue
+import re
 import threading
+
 import numpy as np
 import sounddevice as sd
 from faster_whisper import WhisperModel
@@ -28,8 +27,14 @@ class Listener:
         self.command_queue = command_queue
         self.is_speaking = is_speaking_flag
         self._stop_event = threading.Event()
+        self._wake_re = re.compile(config.WAKE_WORD_PATTERN, re.IGNORECASE)
 
-        logger.info("Загрузка Whisper модели '%s' на %s...", config.WHISPER_MODEL, config.WHISPER_DEVICE)
+        logger.info(
+            "Загрузка Whisper '%s' на %s (%s)...",
+            config.WHISPER_MODEL,
+            config.WHISPER_DEVICE,
+            config.WHISPER_COMPUTE_TYPE,
+        )
         self.model = WhisperModel(
             config.WHISPER_MODEL,
             device=config.WHISPER_DEVICE,
@@ -37,10 +42,7 @@ class Listener:
         )
         logger.info("Whisper загружен.")
 
-        self._wake_re = re.compile(config.WAKE_WORD_PATTERN, re.IGNORECASE)
-
-    # ------------------------------------------------------------------
-    def start(self):
+    def start(self) -> threading.Thread:
         t = threading.Thread(target=self._listen_loop, daemon=True, name="Listener")
         t.start()
         return t
@@ -53,57 +55,76 @@ class Listener:
         chunk_samples = int(config.SAMPLE_RATE * config.CHUNK_DURATION)
         silence_chunks = int(config.VAD_SILENCE_DURATION / config.CHUNK_DURATION)
 
-        logger.info("Слушаю микрофон (порог VAD=%.3f)...", config.VAD_THRESHOLD)
+        logger.info("Слушаю микрофон (VAD порог=%.3f)...", config.VAD_THRESHOLD)
 
         recording = False
         silent_count = 0
         buffer: list[np.ndarray] = []
 
-        with sd.InputStream(
-            samplerate=config.SAMPLE_RATE,
-            channels=config.CHANNELS,
-            dtype="float32",
-            blocksize=chunk_samples,
-        ) as stream:
-            while not self._stop_event.is_set():
-                # Пока Аля говорит — не слушаем
-                if self.is_speaking.is_set():
-                    stream.read(chunk_samples)  # сбросить буфер
-                    recording = False
-                    buffer.clear()
-                    silent_count = 0
-                    continue
+        # Windows: sounddevice автоматически использует WASAPI
+        try:
+            with sd.InputStream(
+                samplerate=config.SAMPLE_RATE,
+                channels=config.CHANNELS,
+                dtype="float32",
+                blocksize=chunk_samples,
+            ) as stream:
+                logger.info("Устройство: %s", sd.query_devices(kind="input")["name"])
 
-                chunk, _ = stream.read(chunk_samples)
-                chunk = chunk[:, 0]  # mono
-                rms = float(np.sqrt(np.mean(chunk ** 2)))
+                while not self._stop_event.is_set():
+                    # Пока Аля говорит — сбрасываем буфер
+                    if self.is_speaking.is_set():
+                        try:
+                            stream.read(chunk_samples)
+                        except Exception:
+                            pass
+                        recording = False
+                        buffer.clear()
+                        silent_count = 0
+                        continue
 
-                if rms > config.VAD_THRESHOLD:
-                    if not recording:
-                        logger.debug("VAD: начало речи (RMS=%.4f)", rms)
-                        recording = True
-                    silent_count = 0
-                    buffer.append(chunk)
-                else:
-                    if recording:
-                        silent_count += 1
-                        buffer.append(chunk)
-                        if silent_count >= silence_chunks:
-                            # Достаточно тишины — транскрибируем
-                            audio = np.concatenate(buffer)
-                            buffer.clear()
-                            recording = False
-                            silent_count = 0
-                            self._process_audio(audio)
+                    try:
+                        chunk, _ = stream.read(chunk_samples)
+                    except Exception as exc:
+                        logger.error("sounddevice ошибка: %s", exc)
+                        continue
+
+                    chunk = chunk[:, 0]  # stereo → mono
+                    rms = float(np.sqrt(np.mean(chunk ** 2)))
+
+                    if rms > config.VAD_THRESHOLD:
+                        if not recording:
+                            logger.debug("VAD: начало речи (RMS=%.4f)", rms)
+                            recording = True
+                        silent_count = 0
+                        buffer.append(chunk.copy())
+                    else:
+                        if recording:
+                            silent_count += 1
+                            buffer.append(chunk.copy())
+                            if silent_count >= silence_chunks:
+                                audio = np.concatenate(buffer)
+                                buffer.clear()
+                                recording = False
+                                silent_count = 0
+                                self._process_audio(audio)
+
+        except Exception as exc:
+            logger.error("Listener: критическая ошибка sounddevice: %s", exc)
+            logger.info("Попробуй проверить устройство ввода в настройках Windows")
 
     # ------------------------------------------------------------------
     def _process_audio(self, audio: np.ndarray):
+        if len(audio) < config.SAMPLE_RATE * 0.3:
+            return  # слишком короткий звук
+
         try:
             segments, _ = self.model.transcribe(
                 audio,
                 language="ru",
                 beam_size=5,
                 vad_filter=True,
+                vad_parameters={"min_silence_duration_ms": 500},
             )
             text = " ".join(s.text for s in segments).strip()
         except Exception as exc:
@@ -115,12 +136,10 @@ class Listener:
 
         logger.debug("Whisper: «%s»", text)
 
-        # Ищем wake-word
         match = self._wake_re.search(text)
         if not match:
             return
 
-        # Вырезаем wake-word и всё до него
         command = text[match.end():].strip(" ,!?.")
         if not command:
             command = "привет"

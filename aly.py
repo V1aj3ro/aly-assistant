@@ -13,12 +13,17 @@ import sys
 import threading
 import time
 
+# Windows: SelectorEventLoop нужен для совместимости с edge-tts и websockets
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import config
 import actions
 import listener as listener_module
 import vision
 import voice
 import tray as tray_module
+
 
 # ------------------------------------------------------------------
 # Логирование
@@ -32,13 +37,12 @@ def _setup_logging():
         datefmt="%H:%M:%S",
     )
 
-    # Консоль
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt)
+    ch.stream.reconfigure(encoding="utf-8")   # Windows: консоль UTF-8
     root.addHandler(ch)
 
-    # Файл с ротацией
     fh = logging.handlers.RotatingFileHandler(
         config.LOG_FILE,
         maxBytes=config.LOG_MAX_BYTES,
@@ -105,33 +109,32 @@ async def main():
     # ------------------------------------------------------------------
     # Главный цикл
     # ------------------------------------------------------------------
+    loop = asyncio.get_event_loop()
+
     while not _shutdown.is_set():
-        # Ждём команду (неблокирующе, чтобы проверять _shutdown)
         try:
             command = command_queue.get(timeout=0.5)
         except queue.Empty:
             continue
 
-        # Пауза
         if _paused.is_set():
-            logger.debug("На паузе, команда проигнорирована: %r", command)
+            logger.debug("Пауза, команда игнорирована: %r", command)
             continue
 
         ts = time.strftime("%H:%M:%S")
         logger.info("[%s] Команда: %s", ts, command)
 
-        # Думаем
         tray.set_status("thinking")
-        result = vision.ask_gemini(command)
+        result = await loop.run_in_executor(None, vision.ask_gemini, command)
 
         ts = time.strftime("%H:%M:%S")
-        logger.info("[%s] Ответ Gemini: %s", ts, result)
+        logger.info("[%s] Gemini: %s", ts, result)
 
-        # Выполняем действие
+        # Действие на ПК (блокирующее — в executor)
         try:
-            reply = actions.execute(result)
+            reply = await loop.run_in_executor(None, actions.execute, result)
         except Exception as exc:
-            logger.error("Ошибка actions.execute: %s", exc)
+            logger.error("actions.execute: %s", exc)
             reply = result.get("reply", "")
             tray.set_status("error")
             await asyncio.sleep(2)

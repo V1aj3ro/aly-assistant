@@ -1,16 +1,17 @@
 """
-tray.py — иконка в системном трее (pystray + Pillow)
+tray.py — системный трей (Windows)
 
-Статусы:
-    listening  → зелёный
-    thinking   → жёлтый
-    speaking   → жёлтый
-    error      → красный
-    paused     → серый
+Иконка — круг с буквой А:
+  listening → зелёный
+  thinking  → жёлтый
+  speaking  → оранжевый
+  error     → красный
+  paused    → серый
 """
 
-import threading
 import logging
+import threading
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 import pystray
@@ -18,12 +19,30 @@ import pystray
 logger = logging.getLogger(__name__)
 
 STATUS_COLORS = {
-    "listening": (76, 175, 80),     # зелёный
-    "thinking":  (255, 193, 7),     # жёлтый
-    "speaking":  (255, 152, 0),     # оранжевый
-    "error":     (244, 67, 54),     # красный
-    "paused":    (120, 120, 120),   # серый
+    "listening": (76,  175, 80),
+    "thinking":  (255, 193,  7),
+    "speaking":  (255, 152,  0),
+    "error":     (244,  67, 54),
+    "paused":    (120, 120, 120),
 }
+
+# Шрифты Windows (по убыванию предпочтительности)
+_WINDOWS_FONTS = [
+    r"C:\Windows\Fonts\arial.ttf",
+    r"C:\Windows\Fonts\segoeui.ttf",
+    r"C:\Windows\Fonts\tahoma.ttf",
+    r"C:\Windows\Fonts\verdana.ttf",
+]
+
+
+def _get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    for path in _WINDOWS_FONTS:
+        if Path(path).exists():
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
 
 
 def _make_icon(status: str) -> Image.Image:
@@ -33,16 +52,10 @@ def _make_icon(status: str) -> Image.Image:
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    # Круг
     margin = 4
     draw.ellipse([margin, margin, size - margin, size - margin], fill=color)
 
-    # Буква "А"
-    try:
-        font = ImageFont.truetype("arial.ttf", 28)
-    except Exception:
-        font = ImageFont.load_default()
-
+    font = _get_font(28)
     text = "А"
     bbox = draw.textbbox((0, 0), text, font=font)
     tw = bbox[2] - bbox[0]
@@ -61,18 +74,14 @@ class TrayIcon:
         self._on_quit = on_quit_callback
         self._on_pause = on_pause_callback
         self._icon: pystray.Icon | None = None
-        self._thread: threading.Thread | None = None
 
     def start(self):
-        self._thread = threading.Thread(target=self._run, daemon=True, name="Tray")
-        self._thread.start()
+        t = threading.Thread(target=self._run, daemon=True, name="Tray")
+        t.start()
 
     def _run(self):
         menu = pystray.Menu(
-            pystray.MenuItem(
-                "Пауза / Продолжить",
-                self._toggle_pause,
-            ),
+            pystray.MenuItem("Пауза / Продолжить", self._toggle_pause),
             pystray.MenuItem(
                 "Статус",
                 lambda icon, item: logger.info("Статус: %s", self._status),
@@ -97,8 +106,7 @@ class TrayIcon:
 
     def _toggle_pause(self, icon, item):
         self._paused = not self._paused
-        new_status = "paused" if self._paused else "listening"
-        self.set_status(new_status)
+        self.set_status("paused" if self._paused else "listening")
         if self._on_pause:
             self._on_pause(self._paused)
 
