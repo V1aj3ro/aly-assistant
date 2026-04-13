@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).parent
 # Gemini
 # =============================================================================
 GEMINI_API_KEY = "AIzaSyBrUc7xoM83VEfx3V_bpqWT_NRC0iZ1Kxg"
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-1.5-flash"  # 2.0-flash требует биллинг; 1.5-flash бесплатно 1500/день
 GEMINI_MIN_INTERVAL = 4.0   # минимум секунд между запросами (rate limit)
 
 # =============================================================================
