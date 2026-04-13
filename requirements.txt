@@ -12,7 +12,7 @@ sounddevice
 numpy
 
 # Gemini API
-google-generativeai
+google-genai
 
 # Скриншот
 mss

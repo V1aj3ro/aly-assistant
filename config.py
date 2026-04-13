@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).parent
 # =============================================================================
 # Gemini
 # =============================================================================
-GEMINI_API_KEY = ""
+GEMINI_API_KEY = "AIzaSyBrUc7xoM83VEfx3V_bpqWT_NRC0iZ1Kxg"
 GEMINI_MODEL = "gemini-2.0-flash"
 GEMINI_MIN_INTERVAL = 4.0   # минимум секунд между запросами (rate limit)
 
@@ -53,7 +53,7 @@ EDGE_TTS_VOICE = "ru-RU-DariyaNeural"
 # =============================================================================
 # RVC
 # =============================================================================
-RVC_ENABLED = True
+RVC_ENABLED = False   # требует Microsoft C++ Build Tools; включи после установки
 RVC_MODEL_PATH = str(BASE_DIR / "models" / "rvc" / "voice.pth")
 RVC_INDEX_PATH = str(BASE_DIR / "models" / "rvc" / "voice.index")
 RVC_PITCH = 0           # 0 = без изменений; +6 = аниме-голос выше
