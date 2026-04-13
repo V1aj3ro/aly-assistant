@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+venv/
+env/
+.venv/
+
+# Логи
+*.log
+*.log.*
+
+# Секреты
+config_local.py
+.env
+
+# VTube Studio токен (персональный)
+.vts_token
+
+# RVC / ML модели (большие файлы)
+models/rvc/*.pth
+models/rvc/*.index
+models/rvc/*.pt
+
+# Временные аудио файлы
+*.wav
+*.mp3
+*.ogg
+!models/**
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/

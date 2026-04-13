@@ -1,0 +1,24 @@
+# Голос и аудио
+faster-whisper
+sounddevice
+soundfile
+edge-tts
+rvc-python
+librosa
+numpy
+
+# Зрение и управление экраном
+google-generativeai
+mss
+Pillow
+pyautogui
+pyperclip
+
+# Live2D / VTube Studio
+websockets
+
+# Трей
+pystray
+
+# Вспомогательное
+pydub
