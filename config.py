@@ -19,7 +19,7 @@ GEMINI_MIN_INTERVAL = 4.0   # минимум секунд между запро�
 # =============================================================================
 WHISPER_MODEL = "base"          # tiny / base / small / medium
 WHISPER_DEVICE = "cuda"         # "cuda" или "cpu"
-WHISPER_COMPUTE_TYPE = "int8_float16"  # int8_float16 для GTX 1080 (Pascal не поддерживает чистый float16)
+WHISPER_COMPUTE_TYPE = "int8_float32"  # GTX 1080 (Pascal): поддерживает int8, float32, int8_float32
 
 # =============================================================================
 # Wake-word
